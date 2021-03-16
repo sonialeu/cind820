@@ -1,0 +1,210 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+``````{r}
+plot(cars)
+```{r}
+```
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+```{r}
+setwd("C:/Users/sonia/Downloads")
+CAvideos <- read_csv("CAvideos.csv/CAvideos.csv")
+str(CAvideos)
+```
+```{r}
+install.packages("tidyverse")
+install.packages("tm")
+install.packages("SnowballC")
+install.packages("ggcorrplot")
+install.packages("wordcloud")
+install.packages("RColorBrewer")
+install.packages("wordcloud2")
+```
+
+
+```{r}
+library(tidyverse)
+library(glue)
+library(stringr)
+library(tm)
+library(SnowballC)
+library(dplyr)
+library(ggcorrplot)
+library(wordcloud)
+library(RColorBrewer)
+library(wordcloud2)
+library(lubridate)
+```
+
+```{r}
+#Dimensions
+dim(dataset)
+```
+```{r}
+#total number of unique videos
+uniquevideos<- table(dataset$video_id)
+length(uniquevideos)
+```
+
+```{r}
+#remove duplicate videos, keep only one video, keep the video by highest view (by video_id)
+
+#sort by number of views
+sort_by_views<- dataset[order(dataset$video_id, dataset$views, decreasing=TRUE),] 
+
+# take the first row within each id
+unique_videos = sort_by_views[!duplicated(sort_by_views$video_id), ]
+head(unique_videos[!duplicated(unique_videos$video_id), ])
+dim(unique_videos)
+```
+
+```{r}
+#Clean data
+
+#convert trending_date and publish_time from character to date
+unique_videos$trending_date<- ydm(unique_videos$trending_date)
+unique_videos$publish_time <- ymd_hms(unique_videos$publish_time)
+```
+
+```{r}
+#Cleaning titles of Youtube videos
+unique_videos$title= gsub("<.*?>","", unique_videos$title) #removing special characters
+unique_videos$title= gsub("[[:punct:]]", " ", unique_videos$title) #removing html tags
+unique_videos$title = gsub("[ |\t]{2,}", " ", unique_videos$title)  # Remove tabs
+unique_videos$title = gsub("^ ", "", unique_videos$title)  # remove initial blanks
+unique_videos$title = gsub(" $", "", unique_videos$title)  # remove tail blanks
+unique_videos$title = gsub(" +", " ", unique_videos$title) # general spaces
+unique_videos$title = tolower(unique_videos$title) # lowering all letters
+unique_videos$title = gsub("[^\x01-\x7F]", "", unique_videos$title) #remove emoticons
+unique_videos$title[1:10] #checking the first 10 rows for data cleaning
+```
+
+
+```{r}
+text_vector <- unique_videos$title
+
+#create a corpus
+title_docs <- Corpus(VectorSource(text_vector))
+toSpace <- content_transformer(function (x , pattern ) gsub(pattern, " ", x))
+```
+
+```{r}
+#Create a document-term-matrix
+
+title_dtm <-TermDocumentMatrix(title_docs)
+title_matrix <- as.matrix(title_dtm)
+title_words <- sort(rowSums(title_matrix), decreasing=TRUE)
+title_df <- data.frame(word=names(title_words), freq=title_words)
+```
+```{r}
+#wordcloud of most common words found in trending titles
+set.seed(1234) # for reproducibility 
+wordcloud(title_words = unique_videos$title, freq = unique_videos$freq, min.freq = 1,           max.words=200, random.order=FALSE, rot.per=0.35,colors=brewer.pal(8, "Dark2"))
+```
+
+
+```{r}
+#match category_ids to category names using the Json filed provided with the dataset: https://www.kaggle.com/datasnaek/youtube-new?select=CA_category_id.json
+
+unique_videos$category_id[unique_videos$category_id =="1"]<- "Film & Animation"
+unique_videos$category_id[unique_videos$category_id =="2"]<- "Autos & Vehicles"
+unique_videos$category_id[unique_videos$category_id =="10"]<- "Music"
+unique_videos$category_id[unique_videos$category_id =="15"]<- "Pets & Animals"
+unique_videos$category_id[unique_videos$category_id =="17"]<- "Sports"
+unique_videos$category_id[unique_videos$category_id =="18"]<- "Short Movies"
+unique_videos$category_id[unique_videos$category_id =="19"]<- "Travel & Events"
+unique_videos$category_id[unique_videos$category_id =="20"]<- "Gaming"
+unique_videos$category_id[unique_videos$category_id =="21"]<- "Videoblogging"
+unique_videos$category_id[unique_videos$category_id =="22"]<- "People & Blogs"
+unique_videos$category_id[unique_videos$category_id =="23"]<- "Comedy"
+unique_videos$category_id[unique_videos$category_id =="24"]<- "Entertainment"
+unique_videos$category_id[unique_videos$category_id =="25"]<- "News & Politics"
+unique_videos$category_id[unique_videos$category_id =="26"]<- "Howto & Style"
+unique_videos$category_id[unique_videos$category_id =="27"]<- "Education"
+unique_videos$category_id[unique_videos$category_id =="28"]<- "Science & Technology"
+unique_videos$category_id[unique_videos$category_id =="29"]<- "Education"
+unique_videos$category_id[unique_videos$category_id =="30"]<- "Movies"
+unique_videos$category_id[unique_videos$category_id =="31"]<- "Anime/Animation"
+unique_videos$category_id[unique_videos$category_id =="32"]<- "Action/Adventure"
+unique_videos$category_id[unique_videos$category_id =="34"]<- "Comedy"
+unique_videos$category_id[unique_videos$category_id =="35"]<- "Documentary"
+unique_videos$category_id[unique_videos$category_id =="36"]<- "Drama"
+unique_videos$category_id[unique_videos$category_id =="37"]<- "Family"
+unique_videos$category_id[unique_videos$category_id =="38"]<- "Foreign"
+unique_videos$category_id[unique_videos$category_id =="39"]<- "Horror"
+unique_videos$category_id[unique_videos$category_id =="40"]<- "Sci-Fi/Fantasy"
+unique_videos$category_id[unique_videos$category_id =="41"]<- "Thriller"
+unique_videos$category_id[unique_videos$category_id =="42"]<- "Shorts"
+unique_videos$category_id[unique_videos$category_id =="43"]<- "Shows"
+unique_videos$category_id[unique_videos$category_id =="44"]<- "Trailers"
+
+
+#create table of the number of category_ids
+unique(unique_videos[c("category_id")])
+category_table <-table(unique_videos$category_id)
+
+#df <- data[order(data$num,decreasing = TRUE),]
+#category_df<-as.data.frame(category_table)
+#category_df
+
+#category_table_sort <- category_df[order(category_df$Frequency),]
+#category_table_sort
+```
+
+
+```{r}
+barplot(category_table, ylab="frequency", col = colors, horiz=F, las=2, cex.names = 0.7)
+```
+
+```{r}
+unique_videos$tags[1:3]
+```
+
+```{r}
+# Load the data as a corpus
+tags_docs <- Corpus(VectorSource(unique_videos$tags))
+
+#cleaning tag column
+tags_docs <- tm_map(tags_docs, toSpace, "/")
+tags_docs <- tm_map(tags_docs, toSpace, "@")
+tags_docs <- tm_map(tags_docs, toSpace, "\\|")
+
+# Convert the text to lower case
+tags_docs <- tm_map(tags_docs, content_transformer(tolower))
+# Remove numbers
+tags_docs <- tm_map(tags_docs, removeNumbers)
+# Remove english common stopwords
+tags_docs <- tm_map(tags_docs, removeWords, stopwords("english"))
+
+# Remove punctuations
+tags_docs <- tm_map(tags_docs, removePunctuation)
+# Eliminate extra white spaces
+tags_docs <- tm_map(tags_docs, stripWhitespace)
+
+#convert to matrix
+tags_docs<- TermDocumentMatrix(tags_docs)
+tag.matrix<- as.matrix(tags_docs)
+tag_title_sort<-sort(rowSums(tag.matrix), decreasing=TRUE)
+
+tags_docs[1:2]
+
+```
+
+```{r}
+
+```
+
