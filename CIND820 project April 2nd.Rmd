@@ -1,0 +1,348 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+``````{r}
+plot(cars)
+```{r}
+```
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+```{r}
+#1. Import Dataset
+```
+
+```{r}
+dataset<- read.csv("C:/Users/sonia/Downloads/CAvideos.csv/CAvideos.csv", stringsAsFactors = FALSE)
+
+#create a copy
+dataset2<-read.csv("C:/Users/sonia/Downloads/CAvideos.csv/CAvideos.csv", stringsAsFactors = FALSE)
+```
+
+```{r}
+#2. Install Packages and libraries
+```
+
+```{r}
+install.packages("tidyverse")
+install.packages("tm")
+install.packages("ggcorrplot")
+install.packages("wordcloud")
+install.packages("RColorBrewer")
+install.packages("wordcloud2")
+install.packages("lsa")
+```
+
+
+```{r}
+options(warn=-1)
+library(tidyverse)
+library(stringr)
+library(tm)
+library(SnowballC)
+library(dplyr)
+library(ggcorrplot)
+library("wordcloud")
+library("RColorBrewer")
+library(wordcloud2)
+library(lubridate)
+library(class)
+library(word2vec)
+library(lsa)
+library(ggplot2)
+library(class)
+library(knitr)
+library(scales)
+```
+
+```{r}
+#3. Examine dataset
+```
+
+```{r}
+#Dimensions
+dim(dataset)
+```
+
+```{r}
+#Summary
+summary(dataset)
+```
+
+```{r}
+#4. Clean data
+```
+
+```{r}
+#Check null values
+lapply(dataset,function(x) { length(which(is.na(x)))})
+```
+
+
+```{r}
+#convert trending_date and publish_time from character to date
+dataset$publish_time <- ymd_hms(dataset$publish_time)
+dataset$trending_date<- ydm(dataset$trending_date)
+#Check class
+str(dataset$publish_time)
+str(dataset$trending_date)
+```
+
+```{r}
+#Clean title column
+
+# Lowercase
+dataset$title <- tolower(dataset$title)
+
+# Remove everything that is not a number or letter
+dataset$title <- stringr::str_replace_all(dataset$title,"[^a-zA-Z\\s]", " ")
+
+# Remove double white spaces
+dataset$title <- stringr::str_replace_all(dataset$title,"[\\s]+", " ")
+
+#Remove stop words
+dataset$title <- removeWords(dataset$title,stopwords())
+
+#Remove emoticons
+dataset$title = gsub("[^\x01-\x7F]", "", dataset$title)
+
+#Check results of the first 10 rows
+dataset$title[1:10]
+```
+```{r}
+#Clean channel_title
+
+# Lowercase
+dataset$channel_title <- tolower(dataset$channel_title)
+
+# Remove everything that is not a number or letter
+dataset$channel_title <- stringr::str_replace_all(dataset$channel_title,"[^a-zA-Z\\s]", " ")
+
+# Remove double white spaces
+dataset$channel_title <- stringr::str_replace_all(dataset$channel_title,"[\\s]+", " ")
+
+#Remove 1 and 2 letter words
+dataset$channel_title <- gsub(" *\\b[[:alpha:]]{1,2}\\b *", " ", dataset$channel_title)
+
+#Remove stop words
+dataset$channel_title <- removeWords(dataset$channel_title,stopwords())
+
+#Remove emoticons
+dataset$channel_title = gsub("[^\x01-\x7F]", "", dataset$channel_title)
+
+#Check results of first 10 rows
+dataset$channel_title[1:10]
+```
+
+```{r}
+#Clean description column
+
+# Lowercase
+dataset$description <- tolower(dataset$description)
+
+#Remove Urls
+dataset$description <- gsub(" ?(f|ht)tp(s?)://(.*)[.][a-z]+", "", dataset$description )
+
+# Remove everything that is not a number or letter
+dataset$description <- stringr::str_replace_all(dataset$description,"[^a-zA-Z\\s]", " ")
+
+# Remove double white spaces
+dataset$description <- stringr::str_replace_all(dataset$description,"[\\s]+", " ")
+
+#Remove 1 and 2 letter words
+dataset$description <- gsub(" *\\b[[:alpha:]]{1,2}\\b *", " ", dataset$description)
+
+#Remove stop words
+dataset$description <- removeWords(dataset$description,stopwords())
+
+#Check results of first 5 rows
+dataset$description[1:5]
+```
+```{r}
+#Clean tags
+
+# Lowercase
+dataset$tags <- tolower(dataset$tags)
+
+# Remove everything that is not a number or letter
+dataset$tags <- stringr::str_replace_all(dataset$tags,"[^a-zA-Z\\s]", " ")
+
+# Remove double white spaces
+dataset$tags <- stringr::str_replace_all(dataset$tags,"[\\s]+", " ")
+
+#Remove 1 and 2 letter words
+dataset$tags <- gsub(" *\\b[[:alpha:]]{1,2}\\b *", " ", dataset$tags)
+
+#Remove stop words
+dataset$tags <- removeWords(dataset$tags,stopwords())
+
+#Check results of first 10 rows
+dataset$tags[1:10]
+```
+```{r}
+#Categories are numerical, there is a Json document that explains what each category means in this link: https://www.kaggle.com/datasnaek/youtube-new?select=CA_category_id.json
+#Likes, dislikes, comments_count and views are all numerical, so no need to convert
+```
+
+```{r}
+#total number of unique videos
+uniquevideos<- table(dataset$video_id)
+length(uniquevideos)
+```
+
+```{r}
+#remove duplicate videos, keep only one video, keep the video by highest view (by video_id)
+
+#sort by number of views
+sort_by_views<- dataset[order(dataset$video_id, dataset$views, decreasing=TRUE),] 
+
+# take the first row within each id
+unique_videos = sort_by_views[!duplicated(sort_by_views$video_id), ]
+head(unique_videos[!duplicated(unique_videos$video_id), ])
+dim(unique_videos)
+```
+```{r}
+#5. Exploratory/Visual Analysis
+```
+
+```{r}
+#match category_ids to category names using the Json filed provided with the dataset: https://www.kaggle.com/datasnaek/youtube-new?select=CA_category_id.json
+
+category_table<-as.data.frame(table(unique_videos$category_id))
+colnames(category_table) <- c("category", "freq")
+category_table
+
+barplot(category_table$freq, names.arg = category_table$category,
+        col =rev(brewer.pal(n=17, name ="Set2")), main ="Youtube Video Categories",ylab = "Category frequencies")
+```
+```{r}
+#Correlation between views, likes, dislikes comment count
+
+dataset_corr <- df1 %>% select(views, likes, dislikes, comment_count)
+
+corr <- cor(dataset_corr, method = "pearson")
+ggcorrplot(corr, method = "square", 
+           ggtheme = ggplot2::theme_minimal,
+           type = "lower",
+           title = "Correlations between views, likes, dislikes and comment counts",
+           outline.col = "black",
+           colors = c("yellow","white", "red"),
+           lab = TRUE,
+           digits = 2)
+
+```
+
+
+
+
+```{r}
+#Due to storage capacity, we will subset of the first 1000 videos with the most views to create the corpus
+df0<-unique_videos[order(-unique_videos$views),] #order by most views
+head(df0)
+
+#Select the first 1000
+df1<-df0[1:1000,]
+```
+
+
+```{r}
+#Most frequent words in the title column
+
+#create a corpus
+docs <- Corpus(VectorSource(df1$title))
+dtm <- TermDocumentMatrix(docs)
+m <- as.matrix(dtm)
+v <- sort(rowSums(m),decreasing=TRUE)
+d <- data.frame(word = names(v),freq=v)
+
+set.seed(1234)
+wordcloud(words = d$word, freq = d$freq, min.freq = 1,
+          max.words=200, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))
+```
+```{r}
+#Most common words by barplot
+barplot(d[1:10,]$freq, las = 2, names.arg = d[1:10,]$word,
+        col =rev(brewer.pal(n=10, name ="YlOrRd")), main ="Top 10 most frequent words in titles",ylab = "Word frequencies")
+```
+
+```{r}
+#Scatterplot of number of characters in a title vs views
+#Create a new column that contains the total number of characters of the title
+df0$nchartitle <- nchar(df0$title)
+
+p<-ggplot(df0, aes(x=nchartitle, y=views))+
+geom_point()
+
+#avoid y-label displaying in scientific notation
+options(scipen=10)
+
+require(scales)
+p + scale_x_continuous(labels = scales::comma)
+
+summary(df0$nchartitle)
+```
+
+
+
+```{r}
+#Most frequent words in the tags column
+#create a corpus
+docs2 <- Corpus(VectorSource(df1$tags))
+dtm2 <- TermDocumentMatrix(docs2)
+m2 <- as.matrix(dtm2)
+v2 <- sort(rowSums(m2),decreasing=TRUE)
+d2 <- data.frame(word = names(v2),freq=v2)
+
+set.seed(1234)
+wordcloud(words = d2$word, freq = d2$freq, min.freq = 1,
+          max.words=200, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"), scale=c(3.5, 0.25))
+```
+```{r}
+#Most common words by barplot
+barplot(d2[1:10,]$freq, las = 2, names.arg = d2[1:10,]$word,
+        col = rev(brewer.pal(n=10, name ="Blues")), main ="Top 10 most frequent tags",
+        ylab = "Word frequencies")
+```
+```{r}
+##Scatterplot of number of tags in a video vs views
+#Because we cleaned the data of tags previously for analysis, we will have to use a copy of the original dataset with unclean data because each tag is separated by "|". In this case stopwords, emojis, etc won't matter because are just counting the number of tags.
+
+#Create a dataframe of unique video_ids
+sort_by_views2<- dataset2[order(dataset2$video_id, dataset2$views, decreasing=TRUE),] 
+unique_videos2 = sort_by_views2[!duplicated(sort_by_views2$video_id), ]
+head(unique_videos2[!duplicated(unique_videos2$video_id), ])
+dim(unique_videos2)
+
+#Create a new column that counts the number of tags per video
+unique_videos2$numtags <- sapply(strsplit(unique_videos2$tags, "\\|"), length)
+dim(unique_videos2)
+
+options(scipen=10)
+
+#Plot scatterplot
+z<-ggplot(unique_videos2, aes(x=numtags, y=views))+
+geom_point()
+z
+
+```
+
+
+
+
+
